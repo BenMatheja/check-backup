@@ -20,7 +20,7 @@ Etc.passwd do |user|
 end
 backup_users.reject!{|x| blacklist.include? x}
 
-#Function to Traverse directories and storing newest file date to hash
+#Function to Traverse directories and storing newest file modified date to hash
 def traverse (directory)
   Dir.chdir(directory)
   Dir.glob("**/*").each do |file| 
@@ -48,12 +48,25 @@ def evaluate (date_of_newest_file)
   end
 end
 
+def count_by_status (status)
+  users_and_result_grouped = @users_and_result.group_by{|k,v| v}
+  users_and_result_grouped[status].size
+end
+
+def names_by_status (status)
+   users_and_result_grouped = @users_and_result.group_by{|k,v| v}
+   result = ""
+   users_and_result_grouped[status].each do |key, value|
+    result += key + " "
+  end
+  result
+end
+
 #Traverse both backup destinations and store users and dates
 traverse(sftp_dir)
 traverse(timemachine_dir)
 
-#puts @users_and_dates
-
+#For all identified backup users, evaluate the file modified dates
 backup_users.each do |user|
   if @users_and_dates.has_key?(user)
     @users_and_result[user] = evaluate(@users_and_dates[user])
@@ -62,33 +75,26 @@ backup_users.each do |user|
   end
 end
 
-puts @users_and_result
+#puts @users_and_result
+backup_succesful_quota = count_by_status(0).to_f / @users_and_result.size.to_f
 
+case backup_succesful_quota
+when 0..0.25
+  status=2
+  statustxt="CRITICAL"
+when 0.26..0.85
+  status=1
+  statustxt="WARN"
+when 0.86..1.0
+  status=0
+  statustxt="OK"
+end
 
+puts "Team Backup is #{statustxt}
+Total Users Checked: #{@users_and_result.size}
+Active Backups found: #{count_by_status(0)}
+Outdated Backups found: #{count_by_status(1)} #{names_by_status(1)}
+Users not having backups: #{count_by_status(2)} #{names_by_status(2)}
+Backups Successful Quota: #{backup_succesful_quota.round(2)}"
 
-#files = `find -type f`.split("\n")
-#puts files
-# infotxt="\nTotal Users Checked: $total_users_checked 
-# Active Backups found: $total_active_backup_counter
-# Outdated Backups found: $(cat tm_old_backup_users sf_old_backup_users | tr "\n" " ")
-# Users not having backups: $(cat tm_not_having_backup_users sf_not_having_backup_users | tr "\n" " ")
-# Backups Successful Quota: $total_backup_succesful_quota "
-# #echo -e "$infotxt" >> check_backupstate.log
-
-# #Reporting for Icinga
-# if [ $(echo "$total_backup_succesful_quota < $threshold_warn" | bc -l) -eq 1 ] && [ $(echo "$total_backup_succesful_quota > $threshold_crit" | bc -l) -eq 1 ]; then
-#   status=1
-#   statustxt=WARN
-# elif [ $(echo "$total_backup_succesful_quota < $threshold_warn" | bc -l) -eq 1 ] && [ $(echo "$total_backup_succesful_quota < $threshold_crit" | bc -l) -eq 1 ]; then
-#   status=2
-#   statustxt=CRITICAL
-# else
-#   status=0
-#   statustxt=OK
-# fi
-# echo -e "Team Backup is $statustxt $infotxt"
-
-# #Cleanup
-# rm tm_users_checked tm_active_backup_counter tm_old_backup_counter tm_not_having_counter sf_users_checked sf_active_backup_counter sf_old_backup_counter sf_not_having_counter passwd_out total_backup_succesful_quota  total_active_backup_counter total_not_having_counter total_old_backup_counter total_users_checked tm_old_backup_users tm_not_having_backup_users tm_having_multiple_users sf_old_backup_users sf_not_having_backup_users sf_having_multiple_users
-# exit $status
-
+exit status

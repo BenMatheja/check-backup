@@ -4,13 +4,11 @@ require 'date'
 
 #Configuration: State 0 active, 1 old, 2 absent
 @latest_backup_allowed=Time.now - (3*7*24*60*60)
-threshold_warn=0.8
-threshold_crit=0.25
 timemachine_dir='/srv/backup'
 sftp_dir='/srv/sftp'
 
 #Retrieve Backup Users
-blacklist = File.read('blacklist')
+blacklist = File.read('/vagrant/blacklist')
 backup_users= Array.new
 @users_and_dates = Hash.new
 @users_and_result = Hash.new
@@ -90,11 +88,16 @@ when 0.86..1.0
   statustxt="OK"
 end
 
-puts "Team Backup is #{statustxt}
+content = "Team Backup is #{statustxt}
 Total Users Checked: #{@users_and_result.size}
 Active Backups found: #{count_by_status(0)}
 Outdated Backups found: #{count_by_status(1)} #{names_by_status(1)}
 Users not having backups: #{count_by_status(2)} #{names_by_status(2)}
 Backups Successful Quota: #{backup_succesful_quota.round(2)}"
+puts content
 
-exit status
+File.write('/vagrant/out', content)
+
+
+
+
